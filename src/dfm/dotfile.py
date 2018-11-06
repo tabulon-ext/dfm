@@ -55,29 +55,24 @@ class Mapping:
 
 
 DEFAULT_MAPPINGS = [
-    Mapping(r'^[.]?config$', link_dir=True, dest=xdg_dir()),
     Mapping(
-        r'^[.]?ggitignore$',
-        dest='~/.gitignore',
-    ),
-    Mapping(
-        r'^\.git$',
+        r'\/\.git\/',
         skip=True,
     ),
     Mapping(
-        r'^\.gitignore$',
+        r'\/.gitignore$',
         skip=True,
     ),
     Mapping(
-        r'^LICENSE(\.md)?$',
+        r'\/LICENSE(\.md)?$',
         skip=True,
     ),
     Mapping(
-        r'^\.dfm\.yml$',
+        r'\/\.dfm\.yml$',
         skip=True,
     ),
     Mapping(
-        r'^README(\.md)?$',
+        r'\/README(\.md)?$',
         skip=True,
     ),
 ]
@@ -124,7 +119,13 @@ class DotfileRepo:  # pylint: disable=too-many-instance-attributes
             'DFM_GIT_COMMIT_MSG',
             'Files managed by DFM! https://github.com/chasinglogic/dfm')
         self.name = os.path.basename(where)
-        self.files = os.listdir(where)
+
+        self.files = []
+
+        for root, dirs, files in os.walk(where):
+            dirs[:] = [d for d in dirs if d != '.git']
+            self.files += [os.path.join(root, f) for f in files]
+
         self.mappings = DEFAULT_MAPPINGS
         self.links = []
         self.hooks = {}
@@ -257,8 +258,8 @@ class DotfileRepo:  # pylint: disable=too-many-instance-attributes
             dest = filename
 
         # Get the absolute path to src
-        src = os.path.join(self.where, filename)
-        dest = os.path.join(self.target_dir, dest)
+        src = os.path.abspath(filename)
+        dest = src.replace(self.where, self.target_dir)
 
         for mapping in self.mappings:
             # If the mapping doesn't match skip to the next one
@@ -354,6 +355,13 @@ class Module(DotfileRepo):
             return
 
         super().sync()
+
+    def link(self, dry_run=False, overwrite=False):
+        """Wrap super()._generate_links"""
+        if self.link_mode == 'none':
+            return []
+
+        return super().link(dry_run=dry_run, overwrite=overwrite)
 
     @property
     def pre(self):
